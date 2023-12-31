@@ -1,9 +1,14 @@
-use crate::auth::{datatypes::{KidsnoteAuth, OAuthTokenResponse}, error_types::{AuthError, AuthErrorCode}};
+use serde::{Deserialize, Serialize};
 
+use crate::auth::{datatypes::{OAuthTokenResponse, KidsnoteAccessToken}, error_types::{AuthError, AuthErrorCode}};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KidsnoteOptions {
     host: String,
     client_id: String,
-    auth: Option<KidsnoteAuth>
+    user_id: Option<String>,
+    refresh_token: Option<String>,
+    access_token: Option<KidsnoteAccessToken>
 }
 
 impl KidsnoteOptions {
@@ -13,7 +18,9 @@ impl KidsnoteOptions {
             client_id: client_id.unwrap_or_else(|| 
                 String::from("eTU0bU4xbHBhWTcyTmlQTEZPQnp5WlNkS2FMV0h4ZUNUV0VoUXp4RzpleENKNVQ5TmlzaGc2NkpEQzh1b1NZN29PM1hTVVVVcjlHRG5penVWaGd3TDJyWkpNVkJHY0hYYTh1UDZ2VmlHbGE2VERGVE8ybDFIMEw3cEdIckFRQ1lpMWsyakEwVTVVT2RmQ2pXeDdSVVJDMk0xZlhhd1ZNRXBIdGJDZExQbQ==")
             ),
-            auth: None
+            user_id: None,
+            refresh_token: None,
+            access_token: None
         }
     }
 
@@ -41,25 +48,42 @@ impl KidsnoteOptions {
         self.host.as_str()
     }
 
-    pub fn get_default_session_or_error(&self) -> Result<KidsnoteAuth, AuthError> {
-        if let Some(auth) = &self.auth {
-            Ok(auth.clone())
+    pub fn get_refresh_token(&self) -> Option<String> {
+        self.refresh_token.clone()
+    }
+
+    pub fn get_access_token_or_error(&self) -> Result<KidsnoteAccessToken, AuthError> {
+        if let Some(access_token) = &self.access_token {
+            Ok(access_token.clone())
         } else {
             Err(AuthError::ErrorWithCode(AuthErrorCode::Unauthorized))
         }
     }
 
-    pub fn set_default_session(&mut self, data:OAuthTokenResponse) {
-        self.auth = Some(KidsnoteAuth {
-            token_type: data.token_type,
-            access_token: data.access_token,
-            scope: data.scope,
+    pub fn set_user_id(&mut self, user_id:String) {
+        self.user_id = Some(user_id);
+    }
+
+    pub fn set_refresh_token(&mut self, refresh_token:String) {
+        self.refresh_token = Some(refresh_token);
+    }
+
+    pub fn set_session_by_oauth(&mut self, data:OAuthTokenResponse) {
+        self.refresh_token = Some(data.refresh_token);
+        self.access_token = Some(KidsnoteAccessToken {
+            r#type: data.token_type,
+            token: data.access_token,
             expires_in: data.expires_in,
-            refresh_token: data.refresh_token,
         });
     }
 
-    pub fn remove_default_session(&mut self) {
-        self.auth = None;
+    pub fn remove_session(&mut self) {
+        self.refresh_token = None;
+        self.access_token = None;
     }
+
+    pub fn is_refresh_token(&self) -> bool { 
+        self.refresh_token.is_some()
+    }
+
 }

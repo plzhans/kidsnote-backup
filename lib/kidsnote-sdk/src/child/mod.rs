@@ -6,28 +6,28 @@ use datatypes::ChildReportResponse;
 use crate::{options::KidsnoteOptions, auth::error_types::AuthError};
 
 pub struct KidsnoteChildSdk {
-    config: Arc<Mutex<KidsnoteOptions>>,
+    options: Arc<Mutex<KidsnoteOptions>>,
 }
 
 impl KidsnoteChildSdk {
     pub fn new(config:Arc<Mutex<KidsnoteOptions>>) -> KidsnoteChildSdk {
         Self { 
-            config
+            options: config
         }
     }
 
     /// 알림장 조회
     pub async fn get_reports(&self, child_id:u64) -> Result<ChildReportResponse, AuthError> {
-        let config = self.config.lock().unwrap();
-        let session = config.get_default_session_or_error()?;
+        let options = self.options.lock().unwrap();
+        let access_token = options.get_access_token_or_error()?;
 
-        let url = format!("{}/v1_2/children/{}/reports/", config.get_host_ref(), child_id);
+        let url = format!("{}/v1_2/children/{}/reports/", options.get_host_ref(), child_id);
 
         let client = reqwest::Client::new();
         let response = client.get(url)
             .header("Content-Type", "application/json")
             //.header("User-Agent", "kidsnote/4.41.1 (Build/11382) (iPhone; iOS 16.2; Scale/3.00)")
-            .header("Authorization", format!("{} {}", session.token_type, session.access_token))
+            .header("Authorization", format!("{} {}", access_token.r#type, access_token.token))
             //.header("x-device-id", "")
             .send()
             .await;

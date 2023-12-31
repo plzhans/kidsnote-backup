@@ -11,7 +11,7 @@ use auth::KidsnoteAuthSdk;
 use user::KidsnoteUserSdk;
 
 pub struct KidsnoteSdk {
-    config: Arc<Mutex<KidsnoteOptions>>,
+    options: Arc<Mutex<KidsnoteOptions>>,
     auth: KidsnoteAuthSdk,
     user: KidsnoteUserSdk,
     child: KidsnoteChildSdk,
@@ -24,10 +24,28 @@ impl KidsnoteSdk {
         let user: KidsnoteUserSdk = KidsnoteUserSdk::new(Arc::clone(&config_arc));
         let child = KidsnoteChildSdk::new(Arc::clone(&config_arc));
         KidsnoteSdk { 
-            config: config_arc,
+            options: config_arc,
             auth,
             user,
             child
+        }
+    }
+
+    pub fn get_options_clone(&self) -> KidsnoteOptions {
+        let options = self.options.lock().unwrap();
+        (*options).clone()
+    }
+
+    pub fn is_refresh_token(&self) -> bool {  
+        let options = self.options.lock().unwrap();
+        options.is_refresh_token()
+    }
+
+    pub fn set_refresh_token(&self, refresh_token:String, user_id:Option<String>) {
+        let mut options = self.options.lock().unwrap();
+        options.set_refresh_token(refresh_token);
+        if let Some(user_id) = user_id { 
+            options.set_user_id(user_id);
         }
     }
 
@@ -42,14 +60,14 @@ impl KidsnoteSdk {
 
     ///
     pub fn get_client_id(&self) -> String { 
-        let config = &self.config.lock().unwrap();
-        config.get_client_id()
+        let options = &self.options.lock().unwrap();
+        options.get_client_id()
     }
     
     ///
     pub fn get_host(&self) -> String { 
-        let config = &self.config.lock().unwrap();
-        config.get_host()
+        let options = &self.options.lock().unwrap();
+        options.get_host()
     }
     
 }

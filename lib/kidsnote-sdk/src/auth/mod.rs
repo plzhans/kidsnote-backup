@@ -9,23 +9,23 @@ use crate::options::KidsnoteOptions;
 use self::{datatypes::OAuthTokenResponse, error_types::AuthError};
 
 pub struct KidsnoteAuthSdk {
-    config: Arc<Mutex<KidsnoteOptions>>,
+    options: Arc<Mutex<KidsnoteOptions>>,
 }
 
 impl KidsnoteAuthSdk {
 
-    pub fn new(config:Arc<Mutex<KidsnoteOptions>>) -> KidsnoteAuthSdk {
+    pub fn new(options:Arc<Mutex<KidsnoteOptions>>) -> KidsnoteAuthSdk {
         Self { 
-            config
+            options
         }
     }
 
     // oauth token
     pub async fn oauth_token(&mut self, params:HashMap<&str, &str>) -> Result<OAuthTokenResponse, AuthError> {
 
-        let mut config = self.config.lock().unwrap();
+        let mut options = self.options.lock().unwrap();
 
-        let url = format!("{}/o/token/", config.get_host_ref());
+        let url = format!("{}/o/token/", options.get_host_ref());
 
         let body = serde_urlencoded::to_string(&params)
             .map_err(|_e| AuthError::GeneralError("serde_urlencoded"))?;
@@ -34,7 +34,7 @@ impl KidsnoteAuthSdk {
         let response = client.post(url)
             .header("Content-Type", "application/x-www-form-urlencoded")
             //.header("User-Agent", "kidsnote/4.41.1 (Build/11382) (iPhone; iOS 16.2; Scale/3.00)")
-            .header("Authorization", format!("Basic {}", config.get_client_id_ref()))
+            .header("Authorization", format!("Basic {}", options.get_client_id_ref()))
             .body(body)
             .send()
             .await;
@@ -45,23 +45,23 @@ impl KidsnoteAuthSdk {
                 {
                     match response.json::<OAuthTokenResponse>().await {
                         Ok(result) => {
-                            config.set_default_session(result.clone());
+                            options.set_session_by_oauth(result.clone());
                             Ok(result)
                         },
                         Err(e) => {
-                            config.remove_default_session();
+                            options.remove_session();
                             //log::error!("update_world_multilingual error: {}", e);
                             Err(AuthError::GeneralErrorStr(format!("parse error. {:?}", e)))
                         }
                     }
                 } else {
-                    config.remove_default_session();
+                    options.remove_session();
                     //log::error!("update_world_multilingual error: {}", response.status().as_u16());
                     Err(AuthError::GeneralErrorStr(format!("status error. status={:?}", response.status())))
                 }
             },
             Err(e) => {
-                config.remove_default_session();
+                options.remove_session();
                 //log::error!("update_world_multilingual error: {}", e);
                 Err(AuthError::GeneralErrorStr(format!("unknown error. {:?}", e)))
             }

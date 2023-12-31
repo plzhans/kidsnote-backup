@@ -1,4 +1,5 @@
 mod command;
+mod kidsnote;
 
 use clap::{Parser, Subcommand};
 use crate::command::login::LoginCommand;
@@ -19,7 +20,7 @@ pub struct Cli {
 pub enum CliCommand {
     Login(crate::command::login::LoginArgs),
     //Auth(crate::command::auth::AuthArgs),
-    Download(crate::command::download::DownlaodArgs),
+    Download(crate::command::download::DownloadArgs),
 }
 
 #[tokio::main]

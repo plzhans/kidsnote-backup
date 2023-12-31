@@ -6,27 +6,27 @@ use datatypes::MeInfoResponse;
 use crate::{options::KidsnoteOptions, auth::error_types::AuthError};
 
 pub struct KidsnoteUserSdk {
-    config: Arc<Mutex<KidsnoteOptions>>,
+    options: Arc<Mutex<KidsnoteOptions>>,
 }
 
 impl KidsnoteUserSdk {
-    pub fn new(config:Arc<Mutex<KidsnoteOptions>>) -> KidsnoteUserSdk {
+    pub fn new(options:Arc<Mutex<KidsnoteOptions>>) -> KidsnoteUserSdk {
         Self { 
-            config
+            options
         }
     }
 
     pub async fn get_myinfo(&self) -> Result<MeInfoResponse, AuthError> {
-        let config = self.config.lock().unwrap();
-        let session = config.get_default_session_or_error()?;
+        let options = self.options.lock().unwrap();
+        let access_token = options.get_access_token_or_error()?;
 
-        let url = format!("{}/v1/me/info/", config.get_host_ref());
+        let url = format!("{}/v1/me/info/", options.get_host_ref());
 
         let client = reqwest::Client::new();
         let response = client.get(url)
             .header("Content-Type", "application/json")
             //.header("User-Agent", "kidsnote/4.41.1 (Build/11382) (iPhone; iOS 16.2; Scale/3.00)")
-            .header("Authorization", format!("{} {}", session.token_type, session.access_token))
+            .header("Authorization", format!("{} {}", access_token.r#type, access_token.token))
             //.header("x-device-id", "")
             .send()
             .await;
