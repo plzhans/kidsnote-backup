@@ -12,7 +12,6 @@ use resource::KidsnoteResourceSdk;
 use child::KidsnoteChildSdk;
 use options::KidsnoteOptions;
 use user::KidsnoteUserSdk;
-use tool::image_tool;
 
 pub struct KidsnoteSdk {
     options: Arc<Mutex<KidsnoteOptions>>,
@@ -89,12 +88,12 @@ mod tests {
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn text_to_image_test() {
-        let text = String::from("안녕하세요 ^^ \n\n어느덧 2023년도 연말이네요~\n연말 마무리는 잘 하고 계신가요?\n\n다름이 아니오라 1월~입학 전까지\n어린이집 주요일정에 대해\n안내드리오니 확인하시고\n미리 일정을 조정하시어\n참석해주시면 감사하겠습니다 ^^\n\n연말 잘 보내시고\n모두 새해 복 많이 받으세요 😊\n\n내년에 만나요 ~ 💖");
+        let text = String::from("ㅠㅠ 오늘은 꼭 등원하려하는데.. 이제가 어제 못자서 그런지 안일어나네요.. 오후에 가도 괜찮은걸까요..?");
 
         let texts: Vec<&str> = text.split('\n')
             .map(|s| s.trim())
             .collect();
         
-        crate::tool::image_tool::ImageTool::text_to_image("[2023-01-01] 브라운스톤어린이집 알림장", &texts, "./test.png");
+        crate::tool::image_tool::ImageTool::text_to_image("[2023-01-01] 브라운스톤어린이집 알림장", "손이제 엄마", &texts, "./test.png");
     }
 }

@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use clap::Parser;
+use filetime::FileTime;
 use kidsnote_sdk::{resource::datatypes::ResourceImageResponse, KidsnoteSdk, options::KidsnoteOptions, user::datatypes::MeInfoResponse, auth::error_types::AuthError, child::datatypes::GetReportsParam, tool::image_tool::ImageTool};
 
-use std::{path::{Path, PathBuf}, time::Duration};
+use std::{path::{Path, PathBuf}, time::Duration, collections::HashMap};
 
 use crate::kidsnote::{KnBackupConfig, KidsnoteConfigProfile};
 
@@ -69,7 +70,7 @@ impl DownloadArgs {
 pub struct DownloadCommand {
     args: DownloadArgs,
     config: KnBackupConfig,
-    kidsnote_sdk: KidsnoteSdk
+    kidsnote_sdk: KidsnoteSdk,
 }
 
 impl DownloadCommand {
@@ -90,7 +91,7 @@ impl DownloadCommand {
         let mut inst = Self {
             args: args,
             config,
-            kidsnote_sdk
+            kidsnote_sdk,
         };
         inst.run_async().await;
     }
@@ -127,7 +128,7 @@ impl DownloadCommand {
                     Some(result)
                 },
                 Err(err) => {
-                    println!("[login][password_login] Error. {}", err);
+                    eprintln!("[login][password_login] Error. {}", err);
                     None
                 }
             }
@@ -143,18 +144,27 @@ impl DownloadCommand {
                 self.config.save(self.args.config_path.clone());
 
                 for child in me.children {
+                    let mut center_map = HashMap::new();
                     for enroll in child.enrollment {
-                        if let Ok(_step_child_report_result) = self.step_child_report(
-                            child.id, 
-                            child.name.clone(), 
-                            enroll.center_id, 
-                            enroll.center_name.clone(),
-                            enroll.belong_to_class,
-                            enroll.class_name.clone()
-                        ).await {
-
+                        if !center_map.contains_key(&enroll.center_id) {
+                            center_map.insert(enroll.center_id, enroll.center_name);
                         }
                     }
+                    
+                    match self.step_child_report_download(
+                        child.id, 
+                        child.name.clone(),
+                        center_map
+                    ).await 
+                    {
+                        Ok(download_count) => {
+                           println!("download finish. count={}", download_count);
+                        }
+                        Err(err) => {
+                            println!("[login][password_login] Error. {}", err);
+                        }
+                    }
+                    
                 }
             }   
         } else {
@@ -182,14 +192,12 @@ impl DownloadCommand {
     }
 
     /// 알림장
-    async fn step_child_report(&mut self, child_id:u64, child_name:String, center_id:u64, center_name:String, class_id:u64, class_name:String) -> Result<i32, AuthError>{
+    async fn step_child_report_download(&mut self, child_id:u64, child_name:String, center_map:HashMap<u64, String>) -> Result<i32, AuthError>{
         println!("[child][{}][report] Start", child_id);
 
         let mut result = 0;
 
         let mut report_options = GetReportsParam::new();
-        report_options.center_id = Some(center_id);
-        report_options.cls = Some(class_id);
 
         let mut loop_count = 0;
         loop {
@@ -208,21 +216,23 @@ impl DownloadCommand {
 
                     let mut download_sources = Vec::new();
                     for report in report_result.results {
+                        let center_name = center_map.get(&report.center).map(|f| f.clone()).unwrap_or_else(|| report.center.to_string());
                         download_sources.push(DownloadSource {
                             report_id: report.id,
                             report_date: report.created,
                             report_content: report.content,
-                            center_id,
-                            center_name: center_name.clone(),
-                            class_id,
-                            class_name: class_name.clone(),
+                            author_name: report.author_name,
+                            center_id: report.center,
+                            center_name,
+                            class_id: report.cls,
+                            class_name: report.class_name.clone(),
                             child_id,
                             child_name: child_name.clone(),
                             attached_images: report.attached_images
                         });
                         result = result + 1;
                     }
-                    self.step_child_report_download(download_sources).await;
+                    self.step_child_report_sourece_download(download_sources).await;
                 },
                 Err(err) => {
                     report_options.page = None;
@@ -243,47 +253,46 @@ impl DownloadCommand {
         Ok(result)
     }
 
-    async fn step_child_report_download(&mut self, sources:Vec<DownloadSource>) {
+    async fn step_child_report_sourece_download(&mut self, sources:Vec<DownloadSource>) {
         for source in sources {
             println!("[child][{}][report][download] Start", source.child_id);
 
             // 알림장 텍스트 변환해서 저장
+            let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
             let title = format!("{} {} 알림장", source.report_date.format("%Y-%m-%d"), source.center_name, );
 
             let mut output_base_path = PathBuf::from(&self.args.output_dir);
-            output_base_path.push(source.child_name.clone());
-            output_base_path.push(source.center_name.clone());
-            output_base_path.push("알림장");
-            output_base_path.push(source.report_date.format("%Y").to_string());
-            output_base_path.push(source.report_date.format("%Y-%m").to_string());
-            output_base_path.push(source.report_date.format("%Y-%m-%d").to_string());
+            output_base_path.push(format!("[{}] {} {}", source.report_date.format("%Y").to_string(), source.center_name, source.child_name));
+            output_base_path.push(format!("[{}] {} {}", source.report_date.format("%Y-%m").to_string(), source.center_name, source.child_name));
 
             let mut output_file = output_base_path.clone();
-            output_file.push(format!("{}_알림장_{}_{}.jpg",source.center_name, source.report_date.format("%Y%m%d"), source.child_name));
+            output_file.push(format!("{}_알림장_{}_{}_{}.jpg",source.center_name, source.report_date.format("%Y%m%d"), source.child_name, source.report_id));
 
             if let Some(contents) = source.report_content {
                 if !contents.trim().is_empty() {
                     let report_contents: Vec<&str> = contents.split('\n')
                         .map(|s| s.trim())
                         .collect();
-
-                    if let Some(output_file ) = output_file.to_str(){
-                        ImageTool::text_to_image(title.as_str(), &report_contents, output_file);
+                    if report_contents.len() > 0 {
+                        if let Some(output_file ) = output_file.to_str(){
+                            ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time);
+                        }
                     }
                 }
             }
-            
+
             // 이미지 다운로드 받기
             // - /{child_name}/{yyyy-MM-dd}/report_{yyyyMMdd}_{center_name}_{report_id}_{image_id}.png
             for image in source.attached_images {
+                
                 let original_file = Path::new(&image.original_file_name);
                 let extension = original_file.extension().and_then(|e| e.to_str()).unwrap_or_else(|| "png");
                 let mut output_file = output_base_path.clone();
-                output_file.push(format!("{}_알림장_{}_{}_{}.{}",source.center_name, source.report_date.format("%Y%m%d"), source.child_name, image.id, extension));
+                output_file.push(format!("{}_알림장_{}_{}_{}_{}.{}",source.center_name, source.report_date.format("%Y%m%d"), source.child_name, source.report_id, image.id, extension));
                 //let path = format!("{}/{}/{}/report_{}_{}_{}_{}.{}", self.args.output_dir, source.child_name, source.report_date.format("%Y-%m-%d"), source.center_name, source.report_id, source.report_date.format("%Y%m%d"), image.id, extension);
                 if let Some(output_file) = output_file.to_str() {
                     match self.kidsnote_sdk.resource()
-                        .download_image(&image.original, image.file_size, output_file)
+                        .download_image(&image.original, image.file_size, file_time, output_file)
                         .await 
                     {
                         Ok(download_result) =>{
@@ -317,6 +326,7 @@ pub struct DownloadSource {
     pub report_id: u64,
     pub report_date: DateTime<Utc>,
     pub report_content: Option<String>,
+    pub author_name: String,
     pub center_id: u64,
     pub center_name: String,
     pub class_id: u64,

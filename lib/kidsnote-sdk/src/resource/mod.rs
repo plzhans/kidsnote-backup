@@ -1,4 +1,5 @@
 use std::{sync::{Mutex, Arc}, io::Write, fs::{self, File}, time::Duration};
+use filetime::FileTime;
 
 use crate::{options::KidsnoteOptions, auth::error_types::AuthError};
 
@@ -15,7 +16,7 @@ impl KidsnoteResourceSdk {
         }
     }
 
-    pub async fn download_image(&self, url:&str, file_size:i32, download_path:&str) -> Result<bool, AuthError> {
+    pub async fn download_image(&self, url:&str, file_size:i32, file_time:FileTime, download_path:&str) -> Result<bool, AuthError> {
        
         // if let Ok(mut ouput_file) = fs::OpenOptions::new()
         //     .append(true)
@@ -66,6 +67,15 @@ impl KidsnoteResourceSdk {
                             output_file
                                 .write_all(&bytes)
                                 .map_err(|err| AuthError::GeneralErrorStr(format!("Error writing to file: {}", err)))?;
+
+                            match filetime::set_file_times(download_path, file_time, file_time ) 
+                            {
+                                Ok(()) => {},
+                                Err(err) => {
+                                    return Err(AuthError::GeneralErrorStr(format!("set_file_times error. {}", err)));
+                                }
+                            }
+
                             return Ok(true);
                         },
                         Err(err) => {
