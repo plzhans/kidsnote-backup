@@ -6,11 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = { version="0.4.31", features = ["serde"] }
-num_enum = "0.7.1"
-reqwest = { version="0.11.23", features=["json"] }
-serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
+tokio = {version = "1.35.1", features = ["full"]}
+chrono = { version="0.4", features = ["serde"] }
+lazy_static = "1"
+num_enum = "0.7.0"
+reqwest = { version="0.11", features=["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 serde_urlencoded = "0.7.1"
-simd-json = "0.13.4"
-thiserror = "1.0.52"
+simd-json = "0.7"
+thiserror = "1"
+image = "0.24.7"
+imageproc = "0.23.0"
+rusttype = "0.9.3"

@@ -1,6 +1,8 @@
 mod command;
 mod kidsnote;
 
+use std::env;
+
 use clap::{Parser, Subcommand};
 use crate::command::login::LoginCommand;
 use crate::command::download::DownloadCommand;
@@ -25,15 +27,31 @@ pub enum CliCommand {
 
 #[tokio::main]
 async fn main() {
+    env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+
     let cli = Cli::parse();
 
     match &cli.command {
-        CliCommand::Login(args) => LoginCommand::run(args),
+        CliCommand::Login(args) => LoginCommand::run(args).await,
         //CliCommand::Auth(args) => AuthCommand::run(args),
-        CliCommand::Download(args) => DownloadCommand::run(args)
+        CliCommand::Download(args) => DownloadCommand::run(args).await
     }
-    
-    //println!("User {:?}!", args.user_id);
-    //println!("Pass {:?}!", args.user_pass);
 }
 
+//#[cfg(tests)]
+mod tests {
+
+    #[ignore]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn download_test() {
+        let args = crate::command::download::DownloadArgs::new();
+        crate::command::download::DownloadCommand::run(&args).await;
+    }
+
+    // #[ignore]
+    // #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    // async fn test_method_test() {
+    //     crate::test_method();
+    // }
+}

@@ -27,8 +27,8 @@ pub struct ChildReportDataResponse {
     pub child_name: String,
     pub child_picture: Option<ResourceImageResponse>,
     pub is_sent_from_center: bool,
-    pub content: String,
-    pub weather: String,
+    pub content: Option<String>,
+    pub weather: Option<String>,
     //pub attached_video: Vec<String>,
     pub num_comments: i32,
     pub read_by_me: bool,
@@ -50,4 +50,23 @@ pub struct ChildReportDataResponse {
  #[derive(Debug, Serialize, Deserialize, Clone)]
  pub struct ChildReportReadByParentResponse {
     pub date_read: String,
+ }
+
+ #[derive(Debug, Serialize, Deserialize, Clone)]
+ pub struct GetReportsParam {
+   pub page: Option<String>,
+   pub page_size: Option<i32>,
+   pub center_id: Option<u64>,
+   pub cls: Option<u64>
+ }
+
+ impl GetReportsParam {
+   pub fn new() -> GetReportsParam {
+      Self { 
+         page: None,
+         page_size: Some(10),
+         center_id: None,
+         cls: None
+      }
+  }
  }

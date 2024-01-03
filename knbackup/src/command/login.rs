@@ -1,6 +1,5 @@
 
 use clap::Parser;
-use futures::executor::block_on;
 use kidsnote_sdk::{options::KidsnoteOptions, KidsnoteSdk, auth::error_types::AuthError, user::datatypes::MeInfoResponse};
 
 use crate::kidsnote::{KnBackupConfig, KidsnoteConfigProfile};
@@ -48,7 +47,7 @@ pub struct LoginCommand {
 impl LoginCommand {
 
     /// init and run
-    pub fn run(args:&LoginArgs){ 
+    pub async fn run(args:&LoginArgs){ 
         let mut args = args.clone();
         //let config_path = args.config_path.clone().unwrap_or_else(|| String::from("~/.knbackup/config.toml"));
         let config_path = args.config_path.clone();
@@ -67,7 +66,7 @@ impl LoginCommand {
             config,
             kidsnote_sdk
         };
-        block_on(inst.run_async(args));
+        inst.run_async(args).await;
     }
 
     ///
@@ -115,7 +114,6 @@ impl LoginCommand {
         if let Some(auth_result) = auth_result {
             if let Ok(me) = self.step_myinfo().await {
                 println!("[login] End.");
-                println!("{:?}", auth_result);
 
                 self.config.set_default(me.user.username, auth_result.refresh_token.clone());
                 self.config.save(args.config_path.clone());
@@ -135,7 +133,6 @@ impl LoginCommand {
         {
             Ok(result) => {
                 println!("[myinfo] End.");
-                println!("{:?}", result);
                 Ok(result)
             },
             Err(err) => {
