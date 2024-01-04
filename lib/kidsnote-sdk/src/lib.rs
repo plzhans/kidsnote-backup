@@ -94,6 +94,7 @@ mod tests {
             .collect();
 
         let filetime = filetime::FileTime::from_unix_time(chrono::Utc::now().timestamp(), 0);
-        crate::tool::image_tool::ImageTool::text_to_image("[2023-01-01] 브라운스톤어린이집 알림장", "손이제 엄마", &texts, "./test.png", filetime);
+        let _result = crate::tool::image_tool::ImageTool::text_to_image("[2023-01-01] 브라운스톤어린이집 알림장", "손이제 엄마", &texts, "./test.png", filetime);
+
     }
 }

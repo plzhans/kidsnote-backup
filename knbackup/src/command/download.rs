@@ -225,7 +225,7 @@ impl DownloadCommand {
         loop {
             loop_count = loop_count+1;
 
-            log::info!(target: "report", "[Child][{}][report][{}] look up. page={}", report_options.page, child_name);
+            log::info!(target: "report", "[Child][{}][report][{:?}] look up. page={}", child_name, report_options.page, child_name);
             match self.kidsnote_sdk
                 .child()
                 .get_reports(child_id, Some(report_options.clone()))
@@ -260,7 +260,7 @@ impl DownloadCommand {
                 },
                 Err(err) => {
                     report_options.page = None;
-                    log::error!(target: "report", "[Child][{}][report][{}] look up error. {}", child_name, report_options.page);
+                    log::error!(target: "report", "[Child][{}][report][{:?}] look up error. {}", child_name, report_options.page, err);
                     return Err(err);
                 }
             }
@@ -279,8 +279,6 @@ impl DownloadCommand {
 
     async fn step_child_report_sourece_download(&mut self, sources:Vec<DownloadSource>) {
         for source in sources {
-            log::info!(target: "report", "[Child][{}][report] download start", source.child_name);
-
             // 알림장 텍스트 변환해서 저장
             let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
             let title = format!("{} {} 알림장", source.report_date.format("%Y-%m-%d"), source.center_name);
@@ -303,10 +301,10 @@ impl DownloadCommand {
                                 
                                 match ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time) {
                                     Ok(_) => {
-                                        log::info!(target: "report", "[Child][{}][report][{}] text to image convert and save", source.child_name, source.report_id);
+                                        log::info!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save.", source.child_name, source.report_id);
                                     },
                                     Err(err) => {
-                                        log::error!(target: "report", "[Child][{}][report][{}] text to image convert and save fail. {}", source.child_name, , source.report_id, err);
+                                        log::error!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save error. {}", source.child_name, source.report_id, err);
                                     }
                                 }
                             }
@@ -331,9 +329,11 @@ impl DownloadCommand {
                         {
                             Ok(download_result) =>{
                                 if download_result {
-                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download. path={}", source.child_name, source.report_id, image.id, output_file);
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download.", source.child_name, source.report_id, image.id);
+                                    log::debug!(target: "report", "File created. path={}", output_file);
                                 } else {
-                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download skip.", source.child_name, source.report_id, image.id, output_file);
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{:?}] download skip.", source.child_name, source.report_id, image.id);
+                                    log::debug!(target: "report", "File skip. path={}", output_file);
                                 }
                             },
                             Err(err) => {
@@ -341,7 +341,9 @@ impl DownloadCommand {
                             }
                         }
                     } else {
-                        log::info!(target: "report", "[Test][Child][{}][report][{}][Image][{}] download. path={}", source.child_name, source.report_id, image.id, output_file);
+                        log::info!(target: "report", "[Test][Child][{}][report][{}][Image][{}] download.", source.child_name, source.report_id, image.id);
+                        log::error!(target: "report", "Download error. path={}", output_file);
+
                     }
                     tokio::time::sleep(Duration::from_millis(1)).await;
                 }

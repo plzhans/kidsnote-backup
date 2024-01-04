@@ -4,13 +4,15 @@ use filetime::FileTime;
 use image::{RgbImage, Rgb};
 use rusttype::{Scale, Font};
 
+use crate::auth::error_types::AuthError;
+
 pub struct ImageTool { 
 
 }
 
 impl ImageTool {
 
-    pub fn text_to_image(title:&str, author_name:&str, contents:&Vec<&str>, imag_path:&str, file_time:FileTime) -> Result<AuthError> {
+    pub fn text_to_image(title:&str, author_name:&str, contents:&Vec<&str>, imag_path:&str, file_time:FileTime) -> Result<(), AuthError> {
 
         let mut max_len = title.len();
         for text in contents {

@@ -85,13 +85,10 @@ impl KidsnoteResourceSdk {
                     }
                 },
                 Err(err) => {
-                    println!("error. {}", err);
                     return Err(AuthError::GeneralErrorStr(format!("unknown error. {:?}", err)));
                 }
             }
         }
-
-        println!("error. no call");
         Err(AuthError::GeneralErrorStr(format!("unknown error. no call")))
     }
 }
