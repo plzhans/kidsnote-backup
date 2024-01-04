@@ -71,6 +71,20 @@ impl DownloadArgs {
     }
 }
 
+pub struct DownloadSource {
+    pub report_id: u64,
+    pub report_date: DateTime<Utc>,
+    pub report_content: Option<String>,
+    pub author_name: String,
+    pub center_id: u64,
+    pub center_name: String,
+    pub class_id: u64,
+    pub class_name: String,
+    pub child_id: u64,
+    pub child_name: String,
+    pub attached_images: Vec<ResourceImageResponse>,
+}
+
 pub struct DownloadCommand {
     args: DownloadArgs,
     config: KnBackupConfig,
@@ -204,12 +218,14 @@ impl DownloadCommand {
 
         let mut result = 0;
 
+        // cls로는 필터링 되는데 center로는 필터가 안된다. 
         let mut report_options = GetReportsParam::new();
 
         let mut loop_count = 0;
         loop {
             loop_count = loop_count+1;
 
+            log::info!(target: "report", "[Child][{}][report][{}] look up. page={}", report_options.page, child_name);
             match self.kidsnote_sdk
                 .child()
                 .get_reports(child_id, Some(report_options.clone()))
@@ -217,33 +233,34 @@ impl DownloadCommand {
             {
                 Ok(report_result) => {
                     report_options.page = report_result.next.clone();
-                    if report_options.page.is_some() {
-                        log::info!("[child][{}][report] Next. loop={}, page={:?}", child_id, loop_count, report_options.page);
+                    
+                    if report_result.results.len() > 0 {
+                        let mut download_sources = Vec::new();
+                        for report in report_result.results {
+                            let center_name = center_map.get(&report.center).map(|f| f.clone()).unwrap_or_else(|| report.center.to_string());
+                            download_sources.push(DownloadSource {
+                                report_id: report.id,
+                                report_date: report.created,
+                                report_content: report.content,
+                                author_name: report.author_name,
+                                center_id: report.center,
+                                center_name,
+                                class_id: report.cls,
+                                class_name: report.class_name.clone(),
+                                child_id,
+                                child_name: child_name.clone(),
+                                attached_images: report.attached_images
+                            });
+                            result = result + 1;
+                        }
+                        self.step_child_report_sourece_download(download_sources).await;
+                    } else {
+                        report_options.page = None;
                     }
-
-                    let mut download_sources = Vec::new();
-                    for report in report_result.results {
-                        let center_name = center_map.get(&report.center).map(|f| f.clone()).unwrap_or_else(|| report.center.to_string());
-                        download_sources.push(DownloadSource {
-                            report_id: report.id,
-                            report_date: report.created,
-                            report_content: report.content,
-                            author_name: report.author_name,
-                            center_id: report.center,
-                            center_name,
-                            class_id: report.cls,
-                            class_name: report.class_name.clone(),
-                            child_id,
-                            child_name: child_name.clone(),
-                            attached_images: report.attached_images
-                        });
-                        result = result + 1;
-                    }
-                    self.step_child_report_sourece_download(download_sources).await;
                 },
                 Err(err) => {
                     report_options.page = None;
-                    log::error!("[child][{}][report] Error: loop={}, {}",  child_id, loop_count, err);
+                    log::error!(target: "report", "[Child][{}][report][{}] look up error. {}", child_name, report_options.page);
                     return Err(err);
                 }
             }
@@ -262,11 +279,11 @@ impl DownloadCommand {
 
     async fn step_child_report_sourece_download(&mut self, sources:Vec<DownloadSource>) {
         for source in sources {
-            log::info!("[child][{}][report][download] Start", source.child_id);
+            log::info!(target: "report", "[Child][{}][report] download start", source.child_name);
 
             // 알림장 텍스트 변환해서 저장
             let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
-            let title = format!("{} {} 알림장", source.report_date.format("%Y-%m-%d"), source.center_name, );
+            let title = format!("{} {} 알림장", source.report_date.format("%Y-%m-%d"), source.center_name);
 
             let mut output_base_path = PathBuf::from(&self.args.output_dir);
             output_base_path.push(format!("[{}] {} {}", source.report_date.format("%Y").to_string(), source.center_name, source.child_name));
@@ -283,7 +300,15 @@ impl DownloadCommand {
                     if report_contents.len() > 0 {
                         if let Some(output_file ) = output_file.to_str(){
                             if !self.args.test {
-                                ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time);
+                                
+                                match ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time) {
+                                    Ok(_) => {
+                                        log::info!(target: "report", "[Child][{}][report][{}] text to image convert and save", source.child_name, source.report_id);
+                                    },
+                                    Err(err) => {
+                                        log::error!(target: "report", "[Child][{}][report][{}] text to image convert and save fail. {}", source.child_name, , source.report_id, err);
+                                    }
+                                }
                             }
                         }
                     }
@@ -305,19 +330,18 @@ impl DownloadCommand {
                             .await 
                         {
                             Ok(download_result) =>{
-                                log::info!("[image][{}] Download. url={} => {}", image.id, image.original, output_file);
                                 if download_result {
-
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download. path={}", source.child_name, source.report_id, image.id, output_file);
                                 } else {
-                                    log::info!("[image][{}] Skip. url={} => {}", image.id, image.original, output_file);
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download skip.", source.child_name, source.report_id, image.id, output_file);
                                 }
                             },
                             Err(err) => {
-                                log::error!("[image][{}] Download error. url={} => {}, {}", image.id, image.original, output_file, err);
+                                log::error!(target: "report", "[Child][{}][report][{}][Image][{}] download error. {}", source.child_name, source.report_id, image.id, err);
                             }
                         }
                     } else {
-
+                        log::info!(target: "report", "[Test][Child][{}][report][{}][Image][{}] download. path={}", source.child_name, source.report_id, image.id, output_file);
                     }
                     tokio::time::sleep(Duration::from_millis(1)).await;
                 }
@@ -327,22 +351,6 @@ impl DownloadCommand {
             // (미구현) 첨부파일 다운로드 받기
             // (미구현) 알림장 텍스트 다운로드 받기
             // (미구현) 댓글 다운로드 받기
-
-            log::info!("[child][{}][report][download] End", source.child_id);
         }
     }
-}
-
-pub struct DownloadSource {
-    pub report_id: u64,
-    pub report_date: DateTime<Utc>,
-    pub report_content: Option<String>,
-    pub author_name: String,
-    pub center_id: u64,
-    pub center_name: String,
-    pub class_id: u64,
-    pub class_name: String,
-    pub child_id: u64,
-    pub child_name: String,
-    pub attached_images: Vec<ResourceImageResponse>,
 }
