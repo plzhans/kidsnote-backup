@@ -79,7 +79,7 @@ impl KidsnoteResourceSdk {
                             return Ok(true);
                         },
                         Err(err) => {
-                            println!("error. {}", err);
+                            log::error!("error. {}", err);
                             return Err(AuthError::GeneralErrorStr(format!("unknown error. {:?}", err)));
                         }
                     }

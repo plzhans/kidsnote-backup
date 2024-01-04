@@ -40,21 +40,21 @@ impl KidsnoteChildSdk {
                 {
                     match response.json::<ChildReportResponse>().await {
                         Ok(result) => {
-                            println!("KidsnoteChildSdk.get_reports:(): count={}, next={:?}", result.count, result.next);
+                            log::info!("KidsnoteChildSdk.get_reports:(): count={}, next={:?}", result.count, result.next);
                             Ok(result)
                         },
                         Err(err) => {
-                            eprintln!("KidsnoteChildSdk.get_reports:(): Error. {:?}", err);
+                            log::error!("KidsnoteChildSdk.get_reports:(): Error. {:?}", err);
                             Err(AuthError::GeneralErrorStr(format!("parse error. {:?}", err)))
                         }
                     }
                 } else {
-                    eprintln!("KidsnoteChildSdk.get_reports:(): Error. status={}", response.status());
+                    log::error!("KidsnoteChildSdk.get_reports:(): Error. status={}", response.status());
                     Err(AuthError::GeneralErrorStr(format!("status error. status={:?}", response.status())))
                 }
             },
             Err(err) => {
-                eprintln!("KidsnoteChildSdk.get_reports:(): Unknown error. {:?}", err);
+                log::error!("KidsnoteChildSdk.get_reports:(): Unknown error. {:?}", err);
                 Err(AuthError::GeneralErrorStr(format!("unknown error. {:?}", err)))
             }
         }

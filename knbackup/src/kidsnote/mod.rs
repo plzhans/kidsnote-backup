@@ -42,27 +42,35 @@ impl KnBackupConfig {
         });
     }
 
-    pub fn save(&self, config_path:String){
-        println!("[config_update] Start.");
-        let config_path = if config_path.starts_with("~/") {
+    pub fn save(&self, save_path:String){
+        let config_path = if save_path.starts_with("~/") {
             let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("./"));
-            let next_dir = &config_path[2..];
+            let next_dir = &save_path[2..];
             home_dir.join(next_dir)
         } else {
-            PathBuf::from(config_path)
+            PathBuf::from(&save_path)
         };
         if let Some(parent_dir) = config_path.parent() {
             if !parent_dir.exists() {
-                fs::create_dir_all(parent_dir).expect("Failed to create directory");
+                if let Err(err) = fs::create_dir_all(parent_dir){
+                    log::info!(target:"config", "config file dir create fail. {}", err);
+                }
             }
         }
 
-        println!("[config_update] Save. Path={:?}", config_path);
         let toml_string = toml::to_string(&self).unwrap();
-        let mut file = File::create(config_path).expect("Failed to create file");
-        file.write_all(toml_string.as_bytes()).expect("Failed to write to file");
-
-        println!("[config_update] End.");
+        match File::create(config_path) {
+            Ok(mut file) => {
+                if let Err(err) = file.write_all(toml_string.as_bytes()){
+                    log::error!(target:"config", "config file save fail. {}", err);
+                } else {
+                    log::info!(target:"config", "config file save. path={}", save_path);
+                }
+            },
+            Err(err) => {
+                log::error!(target:"config", "config file create fail. {}", err);
+            }
+        }
     }
 
 }

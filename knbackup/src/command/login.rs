@@ -40,6 +40,7 @@ impl LoginArgs {
 }
 
 pub struct LoginCommand {
+    args: LoginArgs,
     config: KnBackupConfig,
     kidsnote_sdk: KidsnoteSdk
 }
@@ -64,79 +65,77 @@ impl LoginCommand {
 
         let mut inst = Self {  
             config,
+            args: args.clone(),
             kidsnote_sdk
         };
-        inst.run_async(args).await;
+        inst.next().await;
     }
 
     ///
-    async fn run_async(&mut self, args:LoginArgs) {
-        println!("[login] Start.");
-
-        let auth_result = if let Some(refresh_token) = args.refresh_token.clone() {
-            println!("[login][refresh_token_login] Start.");
+    async fn next(&mut self) {
+        log::info!(target:"login","kidsnote user refresh_token checking..");
+        let auth_result = if let Some(refresh_token) = self.args.refresh_token.clone() {
+            log::info!(target:"login","kidsnote user refresh_token login mode start.");
             match self.kidsnote_sdk
                 .auth()
                 .refresh_token(refresh_token.as_str())
                 .await 
             {
-                Ok(result) => {                  
-                    println!("[login][refresh_token_login] End.");
+                Ok(result) => {
+                    log::info!(target:"login","kidsnote user refresh_token succeeded.");
                     Some(result)
                 },
                 Err(err) => {
-                    println!("[login][refresh_token_login] Error. {}", err);
+                    log::error!(target:"login","kidsnote user refresh_token fail. {}", err);
                     None
                 }
             }
-        } else if let (Some(user_id), Some(user_pass)) = (args.user_id.clone(), args.user_pass.clone())  {
-            println!("[login][password_login] Start.");
+        } else if let (Some(user_id), Some(user_pass)) = (self.args.user_id.clone(), self.args.user_pass.clone())  {
+            log::info!(target:"login","kidsnote user password login mode start.");
             match self.kidsnote_sdk
                 .auth()
                 .login(user_id.as_str(), user_pass.as_str())
                 .await
             {
-                Ok(result) => {                
-                    
-                    println!("[login][password_login] End.");
+                Ok(result) => {
+                    log::info!(target:"login","kidsnote user password login succeeded.");
                     Some(result)
                 },
                 Err(err) => {
-                    println!("[login][password_login] Error. {}", err);
+                    log::error!(target:"login","kidsnote user password login fail. {}", err);
                     None
                 }
             }
         } else {
             None
         };
-       
 
         if let Some(auth_result) = auth_result {
             if let Ok(me) = self.step_myinfo().await {
-                println!("[login] End.");
+                log::info!("[login] End.");
 
                 self.config.set_default(me.user.username, auth_result.refresh_token.clone());
-                self.config.save(args.config_path.clone());
+                self.config.save(self.args.config_path.clone());
             } 
         } else {
-            eprintln!("[login] Error. Invalid args");
+            log::error!(target:"login","Error. Invalid args");
         }
     }
 
     /// 내정보
     async fn step_myinfo(&mut self) -> Result<MeInfoResponse, AuthError>{
-        println!("[myinfo] Start.");
+        log::info!(target:"myinfo","Start.");
         match self.kidsnote_sdk
             .user()
             .get_myinfo()
             .await
         {
             Ok(result) => {
-                println!("[myinfo] End.");
+                log::info!(target:"myinfo","End.");
                 Ok(result)
             },
             Err(err) => {
-                eprintln!("[myinfo] Error: {}", err);
+                log::error!(target:"myinfo","Error: {}", err);
                 Err(err)
             }
         }

@@ -1,3 +1,4 @@
+mod logger;
 mod command;
 mod kidsnote;
 
@@ -14,6 +15,8 @@ use crate::command::download::DownloadCommand;
 #[command(about = "KidsNote backup program", long_about = None)]
 #[command(author, long_about = None)]
 pub struct Cli {
+    #[clap(long, global = true)]
+    debug: bool,
     #[clap(subcommand)]
     pub command: CliCommand,
 }
@@ -21,16 +24,16 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum CliCommand {
     Login(crate::command::login::LoginArgs),
-    //Auth(crate::command::auth::AuthArgs),
     Download(crate::command::download::DownloadArgs),
 }
 
 #[tokio::main]
 async fn main() {
-    env::set_var("RUST_LOG", "debug");
-    env_logger::init();
-
     let cli = Cli::parse();
+    if cli.debug {
+        env::set_var("RUST_LOG", "debug");
+    }
+    logger::init();
 
     match &cli.command {
         CliCommand::Login(args) => LoginCommand::run(args).await,

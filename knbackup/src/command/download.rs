@@ -39,6 +39,9 @@ pub struct DownloadArgs {
 
     #[arg(short = 'o', long = "output-path", value_name = "Output Path", default_value = "./output")]
     pub output_dir: String,
+
+    #[arg(short = 't', long = "test")]
+    pub test: bool,
 }
 
 impl DownloadArgs { 
@@ -52,7 +55,8 @@ impl DownloadArgs {
             config_path: "~/.knbackup/config.toml".to_string(),
             date_start: None,
             date_end: None,
-            output_dir: "./output".to_string()
+            output_dir: "./output".to_string(),
+            test: false,
         }
     }
 
@@ -89,46 +93,45 @@ impl DownloadCommand {
         }
 
         let mut inst = Self {
-            args: args,
+            args,
             config,
             kidsnote_sdk,
         };
-        inst.run_async().await;
+        inst.next().await;
     }
 
     /// 
-    async fn run_async(&mut self) {
-        println!("[login] Start.");
-
+    async fn next(&mut self) {
+        log::info!(target:"login","kidsnote user refresh_token checking..");
         let auth_result = if let Some(refresh_token) = self.args.refresh_token.clone() {
-            println!("[login][refresh_token_login] Start.");
+            log::info!(target:"login","kidsnote user refresh_token login mode start.");
             match self.kidsnote_sdk
                 .auth()
                 .refresh_token(refresh_token.as_str())
                 .await 
             {
                 Ok(result) => {
-                    println!("[login][refresh_token_login] End.");
+                    log::info!(target:"login","kidsnote user refresh_token succeeded.");
                     Some(result)
                 },
                 Err(err) => {
-                    println!("[login][refresh_token_login] Error. {}", err);
+                    log::error!(target:"login","kidsnote user refresh_token fail. {}", err);
                     None
                 }
             }
         } else if let (Some(user_id), Some(user_pass)) = (self.args.user_id.clone(), self.args.user_pass.clone())  {
-            println!("[login][password_login] Start.");
+            log::info!(target:"login","kidsnote user password login mode start.");
             match self.kidsnote_sdk
                 .auth()
                 .login(user_id.as_str(), user_pass.as_str())
                 .await
             {
                 Ok(result) => {
-                    println!("[login][password_login] End.");
+                    log::info!(target:"login","kidsnote user password login succeeded.");
                     Some(result)
                 },
                 Err(err) => {
-                    eprintln!("[login][password_login] Error. {}", err);
+                    log::error!(target:"login","kidsnote user password login fail. {}", err);
                     None
                 }
             }
@@ -137,55 +140,59 @@ impl DownloadCommand {
         };
 
         if let Some(auth_result) = auth_result {
-            println!("[login] End.");
-
             if let Ok(me) = self.step_myinfo().await {
                 self.config.set_default(me.user.username, auth_result.refresh_token.clone());
                 self.config.save(self.args.config_path.clone());
 
                 for child in me.children {
+                    log::info!(target:"myinfo", "[child][{}] center look up.", child.name);
                     let mut center_map = HashMap::new();
                     for enroll in child.enrollment {
                         if !center_map.contains_key(&enroll.center_id) {
                             center_map.insert(enroll.center_id, enroll.center_name);
                         }
                     }
-                    
-                    match self.step_child_report_download(
+
+                    if let Err(_err) = self.step_child_report_download(
                         child.id, 
                         child.name.clone(),
                         center_map
                     ).await 
                     {
-                        Ok(download_count) => {
-                           println!("download finish. count={}", download_count);
-                        }
-                        Err(err) => {
-                            println!("[login][password_login] Error. {}", err);
-                        }
+                        
                     }
-                    
                 }
             }   
         } else {
-            eprintln!("[login] Error. Invalid args");
+            log::error!(target:"login","Error. Invalid args");
         }
     }
 
     /// 내정보
     async fn step_myinfo(&mut self) -> Result<MeInfoResponse, AuthError>{
-        println!("[myinfo] Start.");
+        log::info!(target:"myinfo","kidsnote user info look up start.");
         match self.kidsnote_sdk
             .user()
             .get_myinfo()
             .await
         {
             Ok(result) => {
-                println!("[myinfo] End.");
+                log::info!(target:"myinfo","kidsnote user info look up succeeded. username={}", result.user.username);
+                log::info!(target:"myinfo", "child look up");
+                for child in &result.children {
+                    if child.enrollment.len() == 0 {
+                        log::info!(target:"myinfo","child. name={}", child.name);
+                    } else {
+                        for enroll in &child.enrollment {
+                            log::info!(target:"myinfo","name={}, enrollment={} - {}", child.name, enroll.center_name, enroll.class_name);
+                        }
+                    }
+                }
                 Ok(result)
             },
             Err(err) => {
-                eprintln!("[myinfo] Error: {}", err);
+                log::error!(target:"myinfo","kidsnote user info look up fail.");
+                log::error!("{}", err);
                 Err(err)
             }
         }
@@ -193,7 +200,7 @@ impl DownloadCommand {
 
     /// 알림장
     async fn step_child_report_download(&mut self, child_id:u64, child_name:String, center_map:HashMap<u64, String>) -> Result<i32, AuthError>{
-        println!("[child][{}][report] Start", child_id);
+        log::info!(target:"report","Child:[{}]:Start", child_id);
 
         let mut result = 0;
 
@@ -211,7 +218,7 @@ impl DownloadCommand {
                 Ok(report_result) => {
                     report_options.page = report_result.next.clone();
                     if report_options.page.is_some() {
-                        println!("[child][{}][report] Next. loop={}, page={:?}", child_id, loop_count, report_options.page);
+                        log::info!("[child][{}][report] Next. loop={}, page={:?}", child_id, loop_count, report_options.page);
                     }
 
                     let mut download_sources = Vec::new();
@@ -236,7 +243,7 @@ impl DownloadCommand {
                 },
                 Err(err) => {
                     report_options.page = None;
-                    eprintln!("[child][{}][report] Error: loop={}, {}",  child_id, loop_count, err);
+                    log::error!("[child][{}][report] Error: loop={}, {}",  child_id, loop_count, err);
                     return Err(err);
                 }
             }
@@ -248,14 +255,14 @@ impl DownloadCommand {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
-        println!("[child][{}][report] End.", child_id);
+        log::info!("[child][{}][report] End.", child_id);
 
         Ok(result)
     }
 
     async fn step_child_report_sourece_download(&mut self, sources:Vec<DownloadSource>) {
         for source in sources {
-            println!("[child][{}][report][download] Start", source.child_id);
+            log::info!("[child][{}][report][download] Start", source.child_id);
 
             // 알림장 텍스트 변환해서 저장
             let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
@@ -275,7 +282,9 @@ impl DownloadCommand {
                         .collect();
                     if report_contents.len() > 0 {
                         if let Some(output_file ) = output_file.to_str(){
-                            ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time);
+                            if !self.args.test {
+                                ImageTool::text_to_image(title.as_str(), &source.author_name, &report_contents, output_file, file_time);
+                            }
                         }
                     }
                 }
@@ -284,31 +293,33 @@ impl DownloadCommand {
             // 이미지 다운로드 받기
             // - /{child_name}/{yyyy-MM-dd}/report_{yyyyMMdd}_{center_name}_{report_id}_{image_id}.png
             for image in source.attached_images {
-                
                 let original_file = Path::new(&image.original_file_name);
                 let extension = original_file.extension().and_then(|e| e.to_str()).unwrap_or_else(|| "png");
                 let mut output_file = output_base_path.clone();
                 output_file.push(format!("{}_알림장_{}_{}_{}_{}.{}",source.center_name, source.report_date.format("%Y%m%d"), source.child_name, source.report_id, image.id, extension));
                 //let path = format!("{}/{}/{}/report_{}_{}_{}_{}.{}", self.args.output_dir, source.child_name, source.report_date.format("%Y-%m-%d"), source.center_name, source.report_id, source.report_date.format("%Y%m%d"), image.id, extension);
                 if let Some(output_file) = output_file.to_str() {
-                    match self.kidsnote_sdk.resource()
-                        .download_image(&image.original, image.file_size, file_time, output_file)
-                        .await 
-                    {
-                        Ok(download_result) =>{
-                            println!("[image][{}] Download. url={} => {}", image.id, image.original, output_file);
-                            if download_result {
-                                tokio::time::sleep(Duration::from_millis(1)).await;
-                            } else {
-                                println!("[image][{}] Skip. url={} => {}", image.id, image.original, output_file);
+                    if !self.args.test {
+                        match self.kidsnote_sdk.resource()
+                            .download_image(&image.original, image.file_size, file_time, output_file)
+                            .await 
+                        {
+                            Ok(download_result) =>{
+                                log::info!("[image][{}] Download. url={} => {}", image.id, image.original, output_file);
+                                if download_result {
+
+                                } else {
+                                    log::info!("[image][{}] Skip. url={} => {}", image.id, image.original, output_file);
+                                }
+                            },
+                            Err(err) => {
+                                log::error!("[image][{}] Download error. url={} => {}, {}", image.id, image.original, output_file, err);
                             }
-                        },
-                        Err(err) => {
-                            tokio::time::sleep(Duration::from_millis(1)).await;
-                            eprintln!("[image][{}] Download error. url={} => {}, {}", image.id, image.original, output_file, err);
                         }
+                    } else {
+
                     }
-                    
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
             }
 
@@ -317,7 +328,7 @@ impl DownloadCommand {
             // (미구현) 알림장 텍스트 다운로드 받기
             // (미구현) 댓글 다운로드 받기
 
-            println!("[child][{}][report][download] End", source.child_id);
+            log::info!("[child][{}][report][download] End", source.child_id);
         }
     }
 }
