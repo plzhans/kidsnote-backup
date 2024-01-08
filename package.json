@@ -1,0 +1,10 @@
+{
+  "name": "kidsnote-backup",
+  "scripts": {
+    "changelog": "npx standard-version --tag-prefix \"release/\" "
+  },
+  "devDependencies": {
+    "standard-version": "^9.5.0"
+  },
+  "version": "0.0.0"
+}
