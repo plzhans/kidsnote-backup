@@ -85,5 +85,6 @@ cargo build --release
 ```
 
 ## 해야할 것들
+- 알림장의 텍스트에 댓글 텍스트 추가하기
 - 알림장의 첨부 비디오 다운로드 받기
 - access_token 만료 되었을 경우 refresh 하기

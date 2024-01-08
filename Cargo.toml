@@ -1,5 +1,8 @@
-[workspace]
+[profile.release]
+lto = "thin"
 
+[workspace]
+resolver = "2"
 members = [
     "knbackup",
     "lib/kidsnote-sdk"
