@@ -1,11 +1,11 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::resource::datatypes::ResourceImageResponse;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MeInfoResponse {
     pub user: MeInfoUserResponse,
-    pub children: Vec<MeInfoChildrenResponse>
+    pub children: Vec<MeInfoChildrenResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,7 +38,7 @@ pub struct MeInfoChildrenResponse {
     pub gender: String,
     pub family_type: String,
     pub picture: Option<ResourceImageResponse>, //
-    pub parent: MeInfoChildParentResponse, //
+    pub parent: MeInfoChildParentResponse,      //
     pub enrollment: Vec<MeInfoChildEnrollment>, //
 }
 
@@ -52,7 +52,7 @@ pub struct MeInfoChildParentResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MeInfoChildEnrollment{
+pub struct MeInfoChildEnrollment {
     pub id: u64,
     pub created: String,
     pub modified: String,

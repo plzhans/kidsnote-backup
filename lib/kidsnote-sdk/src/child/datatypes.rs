@@ -1,15 +1,14 @@
-
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::resource::datatypes::ResourceImageResponse;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildReportResponse {
-   pub count: i32,
-   pub next: Option<String>,
-   pub previous: Option<String>,
-   pub results: Vec<ChildReportDataResponse>,
+    pub count: i32,
+    pub next: Option<String>,
+    pub previous: Option<String>,
+    pub results: Vec<ChildReportDataResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,37 +35,37 @@ pub struct ChildReportDataResponse {
     pub attached_images: Vec<ResourceImageResponse>,
     //pub attached_files: Vec<String>,
     pub thumbnail: Option<String>,
- }
+}
 
- #[derive(Debug, Serialize, Deserialize, Clone)]
- pub struct ChildReportAuthorResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChildReportAuthorResponse {
     pub id: u64,
     pub r#type: String,
     pub name: String,
     pub picture: Option<ResourceImageResponse>,
     pub username: String,
- }
+}
 
- #[derive(Debug, Serialize, Deserialize, Clone)]
- pub struct ChildReportReadByParentResponse {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChildReportReadByParentResponse {
     pub date_read: String,
- }
+}
 
- #[derive(Debug, Serialize, Deserialize, Clone)]
- pub struct GetReportsParam {
-   pub page: Option<String>,
-   pub page_size: Option<i32>,
-   pub center_id: Option<u64>,
-   pub cls: Option<u64>
- }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GetReportsParam {
+    pub page: Option<String>,
+    pub page_size: Option<i32>,
+    pub center_id: Option<u64>,
+    pub cls: Option<u64>,
+}
 
- impl GetReportsParam {
-   pub fn new() -> GetReportsParam {
-      Self { 
-         page: None,
-         page_size: Some(10),
-         center_id: None,
-         cls: None
-      }
-  }
- }
+impl GetReportsParam {
+    pub fn new() -> GetReportsParam {
+        Self {
+            page: None,
+            page_size: Some(10),
+            center_id: None,
+            cls: None,
+        }
+    }
+}

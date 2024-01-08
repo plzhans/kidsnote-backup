@@ -1,19 +1,21 @@
 use std::fs;
 
 use filetime::FileTime;
-use image::{RgbImage, Rgb};
-use rusttype::{Scale, Font};
+use image::{Rgb, RgbImage};
+use rusttype::{Font, Scale};
 
 use crate::auth::error_types::AuthError;
 
-pub struct ImageTool { 
-
-}
+pub struct ImageTool {}
 
 impl ImageTool {
-
-    pub fn text_to_image(title:&str, author_name:&str, contents:&Vec<&str>, imag_path:&str, file_time:FileTime) -> Result<(), AuthError> {
-
+    pub fn text_to_image(
+        title: &str,
+        author_name: &str,
+        contents: &Vec<&str>,
+        imag_path: &str,
+        file_time: FileTime,
+    ) -> Result<(), AuthError> {
         let mut max_len = title.len();
         for text in contents {
             if max_len < text.len() {
@@ -22,8 +24,8 @@ impl ImageTool {
         }
 
         let width = (max_len as u32) * 8 + 20;
-        let height: u32 = ((contents.len()+1) as u32)* 42 + 50;
-      
+        let height: u32 = ((contents.len() + 1) as u32) * 42 + 50;
+
         let mut img = RgbImage::new(width, height);
 
         // 배경을 흰색으로 채우기
@@ -37,15 +39,7 @@ impl ImageTool {
         let scale = Scale { x: 24.0, y: 24.0 }; // 폰트 크기 조정
 
         // 제목
-        imageproc::drawing::draw_text_mut(
-            &mut img,
-            Rgb([0, 0, 0]),
-            10,
-            10,
-            scale,
-            &font,
-            title,
-        );
+        imageproc::drawing::draw_text_mut(&mut img, Rgb([0, 0, 0]), 10, 10, scale, &font, title);
 
         // 작성자
         imageproc::drawing::draw_text_mut(
@@ -57,7 +51,7 @@ impl ImageTool {
             &font,
             &format!("작성자 : {}", author_name),
         );
-        
+
         // 내용
         let mut y_position = 90.0;
         for text in contents {
@@ -81,16 +75,14 @@ impl ImageTool {
                 }
             }
         }
-        
+
         img.save(imag_path).expect("Unable to save image");
 
-        match filetime::set_file_times(imag_path, file_time, file_time ) 
-        {
-            Ok(()) => {},
+        match filetime::set_file_times(imag_path, file_time, file_time) {
+            Ok(()) => {}
             Err(_err) => {}
         }
 
         Ok(())
-
     }
-} 
+}

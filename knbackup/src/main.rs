@@ -1,12 +1,12 @@
-mod logger;
 mod command;
 mod kidsnote;
+mod logger;
 
 use std::env;
 
-use clap::{Parser, Subcommand};
-use crate::command::login::LoginCommand;
 use crate::command::download::DownloadCommand;
+use crate::command::login::LoginCommand;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(name = "Kidsnote backup")]
@@ -38,7 +38,7 @@ async fn main() {
     match &cli.command {
         CliCommand::Login(args) => LoginCommand::run(args).await,
         //CliCommand::Auth(args) => AuthCommand::run(args),
-        CliCommand::Download(args) => DownloadCommand::run(args).await
+        CliCommand::Download(args) => DownloadCommand::run(args).await,
     }
 }
 
