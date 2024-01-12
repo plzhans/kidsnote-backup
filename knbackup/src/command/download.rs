@@ -257,13 +257,28 @@ impl DownloadCommand {
         let mut result = 0;
 
         // cls로는 필터링 되는데 center로는 필터가 안된다.
+
+        // 날짜 필터링
         let mut report_options = GetReportsParam::new();
+        if self.args.date_start.is_some() && self.args.date_end.is_some() {
+            report_options.date_start = self.args.date_start.clone();
+            report_options.date_end = self.args.date_end.clone();
+            report_options.tz = Some("Asia/Seoul".to_string());
+        } else if self.args.date_start.is_some() {
+            report_options.date_start = self.args.date_start.clone();
+            report_options.date_end = self.args.date_start.clone();
+            report_options.tz = Some("Asia/Seoul".to_string());
+        } else if self.args.date_end.is_some() {
+            report_options.date_start = self.args.date_end.clone();
+            report_options.date_end = self.args.date_end.clone();
+            report_options.tz = Some("Asia/Seoul".to_string());
+        }
 
         let mut loop_count = 0;
         loop {
             loop_count += 1;
 
-            log::info!(target: "report", "[Child][{}][report][{:?}] look up. page={}", child_name, report_options.page, child_name);
+            log::info!(target: "report", "[Child][{}][report] look up. page={:?}, ds={:?}, de={:?}", child_name, report_options.page, report_options.date_start, report_options.date_end);
             match self
                 .kidsnote_sdk
                 .child()
@@ -303,7 +318,7 @@ impl DownloadCommand {
                 }
                 Err(err) => {
                     report_options.page = None;
-                    log::error!(target: "report", "[Child][{}][report][{:?}] look up error. {}", child_name, report_options.page, err);
+                    log::error!(target: "report", "[Child][{}][report] look up error. {}", child_name, err);
                     return Err(err);
                 }
             }

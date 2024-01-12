@@ -57,6 +57,9 @@ pub struct GetReportsParam {
     pub page_size: Option<i32>,
     pub center_id: Option<u64>,
     pub cls: Option<u64>,
+    pub date_start: Option<String>,
+    pub date_end: Option<String>, 
+    pub tz: Option<String>,
 }
 
 impl GetReportsParam {
@@ -66,6 +69,9 @@ impl GetReportsParam {
             page_size: Some(10),
             center_id: None,
             cls: None,
+            date_start: None,
+            date_end: None,
+            tz: None
         }
     }
 }
