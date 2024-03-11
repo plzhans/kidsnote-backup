@@ -90,6 +90,8 @@ impl KidsnoteSdk {
 
 //#[cfg(tests)]
 mod tests {
+    mod tool;
+
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn text_to_image_test() {
@@ -97,13 +99,14 @@ mod tests {
 
         let texts: Vec<&str> = text.split('\n').map(|s| s.trim()).collect();
 
-        let filetime = filetime::FileTime::from_unix_time(chrono::Utc::now().timestamp(), 0);
-        let _result = crate::tool::image_tool::ImageTool::text_to_image(
+        let file_time = chrono::Utc::now();
+        let _result = crate::tool::image_tool::ImageTool::text_to_image_file(
             "[2023-01-01] 브라운스톤어린이집 알림장",
-            "손이제 엄마",
+            &Some("활빈당".to_string()),
+            "홍길동 엄마",
             &texts,
             "./test.png",
-            filetime,
+            file_time,
         );
     }
 }

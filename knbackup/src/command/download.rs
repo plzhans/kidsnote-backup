@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
 use filetime::FileTime;
 use kidsnote_sdk::{
@@ -8,9 +8,7 @@ use kidsnote_sdk::{
 };
 
 use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    time::Duration,
+    collections::HashMap, path::{Path, PathBuf}, time::Duration
 };
 
 use crate::kidsnote::{KidsnoteConfigProfile, KnBackupConfig};
@@ -109,12 +107,12 @@ impl Default for DownloadArgs {
 }
 
 pub struct DownloadSource {
-    pub report_id: u64,
+    pub source_type: String,
+    pub source_id: u64,
     pub report_date: DateTime<Utc>,
     pub report_content: Option<String>,
     pub author_name: String,
-    pub center_id: u64,
-    pub center_name: String,
+    pub center_name: Option<String>,
     pub class_id: u64,
     pub class_name: String,
     pub child_id: u64,
@@ -207,11 +205,12 @@ impl DownloadCommand {
                         center_map.entry(enroll.center_id)
                             .or_insert(enroll.center_name);
                     }
-
-                    if let Err(_err) = self
-                        .step_child_report_download(child.id, child.name.clone(), center_map)
+                    
+                    if let Err(err) = self.step_child_report_download(child.id, child.name.clone(), center_map)
                         .await
-                    {}
+                    {
+                        log::error!(target:"myinfo","step_child_report_download error. {}", err);
+                    }
                 }
             }
         } else {
@@ -291,17 +290,17 @@ impl DownloadCommand {
                     if !report_result.results.is_empty() {
                         let mut download_sources = Vec::new();
                         for report in report_result.results {
-                            let center_name = center_map
-                                .get(&report.center)
-                                .cloned()
-                                .unwrap_or(report.center.to_string());
+                            let center_name = report.center
+                                .and_then(|f| center_map.get(&f).cloned())
+                                .or(Some(String::from("")));
+
                             download_sources.push(DownloadSource {
-                                report_id: report.id,
+                                source_type: String::from("알림장"),
+                                source_id: report.id,
                                 report_date: report.created,
                                 report_content: report.content,
                                 author_name: report.author_name,
-                                center_id: report.center,
-                                center_name,
+                                center_name: center_name,
                                 class_id: report.cls,
                                 class_name: report.class_name.clone(),
                                 child_id,
@@ -343,55 +342,77 @@ impl DownloadCommand {
     async fn step_child_report_sourece_download(&mut self, sources: Vec<DownloadSource>) {
         for source in sources {
             // 알림장 텍스트 변환해서 저장
-            let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
             let title = format!(
-                "{} {} 알림장",
-                source.report_date.format("%Y-%m-%d"),
-                source.center_name
+                "제목 : {} {}",
+                Utc.from_utc_datetime(&source.report_date.naive_utc()).format("%Y년 %-m월 %-e일"),
+                source.source_type
             );
 
             let mut output_base_path = PathBuf::from(&self.args.output_dir);
             output_base_path.push(format!(
-                "[{}] {} {}",
-                source.report_date.format("%Y"),
-                source.center_name,
+                "키즈노트 {}",
                 source.child_name
             ));
-            output_base_path.push(format!(
-                "[{}] {} {}",
-                source.report_date.format("%Y-%m"),
-                source.center_name,
-                source.child_name
-            ));
+            output_base_path.push("알림장");
+            output_base_path.push(source.report_date.format("%Y-%m").to_string());
 
-            let mut output_file = output_base_path.clone();
-            output_file.push(format!(
-                "{}_알림장_{}_{}_{}.jpg",
-                source.center_name,
+            let mut text_file = output_base_path.clone();
+            text_file.push(format!(
+                "{}_{}_{}_{}.txt",
                 source.report_date.format("%Y%m%d"),
                 source.child_name,
-                source.report_id
+                source.source_type,
+                source.source_id
+            ));
+
+            let mut image_file = output_base_path.clone();
+            image_file.push(format!(
+                "{}_{}_{}_{}.jpg",
+                source.report_date.format("%Y%m%d"),
+                source.child_name,
+                source.source_type,
+                source.source_id
             ));
 
             if let Some(contents) = source.report_content {
                 if !contents.trim().is_empty() {
-                    let report_contents: Vec<&str> =
-                        contents.split('\n').map(|s| s.trim()).collect();
-                    if !report_contents.is_empty() {
-                        if let Some(output_file) = output_file.to_str() {
-                            if !self.args.test {
-                                match ImageTool::text_to_image(
+                    let new_contents = contents.replace("  ", " ");
+                    let new_contents: Vec<&str> = new_contents.lines()
+                        .map(|s| s.trim())
+                        .collect();
+                    if !new_contents.is_empty() {
+                        if !self.args.test {
+                            if let Some(output_file) = text_file.to_str() {
+                                match ImageTool::text_to_txt_file(
                                     title.as_str(),
+                                    &source.center_name,
                                     &source.author_name,
-                                    &report_contents,
+                                    &new_contents,
                                     output_file,
-                                    file_time,
+                                    source.report_date,
                                 ) {
                                     Ok(_) => {
-                                        log::info!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save.", source.child_name, source.report_id);
+                                        log::info!(target: "report", "[Child][{}][report][{}][Content] text save.", source.child_name, source.source_id);
                                     }
                                     Err(err) => {
-                                        log::error!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save error. {}", source.child_name, source.report_id, err);
+                                        log::error!(target: "report", "[Child][{}][report][{}][Content] text save error. {}", source.child_name, source.source_id, err);
+                                    }
+                                }
+                            }
+                            if let Some(output_file) = image_file.to_str() {
+                                match ImageTool::text_to_image_file(
+                                    title.as_str(),
+                                    &source.center_name,
+                                    &source.author_name,
+                                    &new_contents,
+                                    output_file,
+                                    source.report_date,
+                                ) {
+                                    Ok(_) => {
+                                        log::info!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save.", source.child_name, source.source_id);
+                                    }
+                                    Err(err) => {
+                                        log::error!(target: "report", "[Child][{}][report][{}][Content] Convert text to image and save error. {}", source.child_name, source.source_id, err);
                                     }
                                 }
                             }
@@ -399,9 +420,9 @@ impl DownloadCommand {
                     }
                 }
             }
-
+            
             // 이미지 다운로드 받기
-            // - /{child_name}/{yyyy-MM-dd}/report_{yyyyMMdd}_{center_name}_{report_id}_{image_id}.png
+            let file_time = FileTime::from_unix_time(source.report_date.timestamp(), 0);
             for image in source.attached_images {
                 let original_file = Path::new(&image.original_file_name);
                 let extension = original_file
@@ -410,11 +431,11 @@ impl DownloadCommand {
                     .unwrap_or("png");
                 let mut output_file = output_base_path.clone();
                 output_file.push(format!(
-                    "{}_알림장_{}_{}_{}_{}.{}",
-                    source.center_name,
+                    "{}_{}_{}_{}_{}.{}",
                     source.report_date.format("%Y%m%d"),
                     source.child_name,
-                    source.report_id,
+                    source.source_type,
+                    source.source_id,
                     image.id,
                     extension
                 ));
@@ -434,19 +455,19 @@ impl DownloadCommand {
                         {
                             Ok(download_result) => {
                                 if download_result {
-                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download.", source.child_name, source.report_id, image.id);
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{}] download.", source.child_name, source.source_id, image.id);
                                     log::debug!(target: "report", "File created. path={}", output_file);
                                 } else {
-                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{:?}] download skip.", source.child_name, source.report_id, image.id);
+                                    log::info!(target: "report", "[Child][{}][report][{}][Image][{:?}] download skip.", source.child_name, source.source_id, image.id);
                                     log::debug!(target: "report", "File skip. path={}", output_file);
                                 }
                             }
                             Err(err) => {
-                                log::error!(target: "report", "[Child][{}][report][{}][Image][{}] download error. {}", source.child_name, source.report_id, image.id, err);
+                                log::error!(target: "report", "[Child][{}][report][{}][Image][{}] download error. {}", source.child_name, source.source_id, image.id, err);
                             }
                         }
                     } else {
-                        log::info!(target: "report", "[Test][Child][{}][report][{}][Image][{}] download.", source.child_name, source.report_id, image.id);
+                        log::info!(target: "report", "[Test][Child][{}][report][{}][Image][{}] download.", source.child_name, source.source_id, image.id);
                         log::error!(target: "report", "Download error. path={}", output_file);
                     }
                     tokio::time::sleep(Duration::from_millis(1)).await;

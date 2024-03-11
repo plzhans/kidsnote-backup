@@ -19,7 +19,7 @@ pub struct ChildReportDataResponse {
     pub date_written: String,
     pub author: ChildReportAuthorResponse,
     pub author_name: String,
-    pub center: u64,
+    pub center: Option<u64>,
     pub cls: u64,
     pub class_name: String,
     pub child: u64,
