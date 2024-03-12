@@ -9,10 +9,9 @@ use crate::command::login::LoginCommand;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "Kidsnote backup")]
-#[command(version = "0.1.0")]
+#[command(version)]
 #[command(author = "plzhans <plzhans@gmail.com>")]
-#[command(about = "KidsNote backup program", long_about = None)]
+#[command(about = "kidsnote backup program", long_about = None)]
 #[command(author, long_about = None)]
 pub struct Cli {
     #[clap(long, global = true)]

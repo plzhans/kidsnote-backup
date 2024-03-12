@@ -69,12 +69,12 @@ jobs:
     - name: Build Cargo Release - Linux
       run: | 
         cargo build --release
-        zip -j knbackup_linux.zip ./target/release/knbackup
+        tar -cvzf knbackup_linux.tar.gz -C ./target/release knbackup
     - name: Upload binary file for linux.
       uses: actions/upload-artifact@v3
       with:
-        name: knbackup_linux.zip
-        path: knbackup_linux.zip
+        name: knbackup_linux.tar.gz
+        path: knbackup_linux.tar.gz
   
   # Build Windows
   build_windows64:
@@ -118,7 +118,7 @@ jobs:
       - name: Download binary file for Linux.
         uses: actions/download-artifact@v3
         with:
-          name: knbackup_linux.zip
+          name: knbackup_linux.tar.gz
       - name: Download binary file for Windows.
         uses: actions/download-artifact@v3
         with:
@@ -141,9 +141,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: knbackup_linux.zip
-          asset_name: knbackup_release_${{ steps.extract_tag.outputs.tag_without_prefix }}_linux.zip
-          asset_content_type: application/zip
+          asset_path: knbackup_linux.tar.gz
+          asset_name: knbackup_release_${{ steps.extract_tag.outputs.tag_without_prefix }}_linux.tar.gz
+          asset_content_type: application/gzip
       - name: Upload Release Artifact - Windows release
         id: upload-release-asset-windows
         uses: actions/upload-release-asset@v1
